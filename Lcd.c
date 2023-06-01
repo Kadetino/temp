@@ -23,7 +23,7 @@ sbit LCD_D6 at P3_6_bit;
 sbit LCD_D7 at P3_7_bit;
 
 
-char txt1[] = "asdf";
+char storage[256];
 
 char i;                              // Loop variable
 char uart_rd;
@@ -80,15 +80,24 @@ void main(){
       {
         UART1_Write(13);
         cur_row +=1;
+        //need to test code below
         if (cur_col != 1) cur_col = 1; //
       }
       if (uart_rd == 8) // Backspace  8
       {
         UART1_Write(8);
         cur_col-=1;
+        //need to test code below
+        LCD_Chr(cur_row,cur_col,32);
       }
       if (uart_rd == 127) // Delete  127
-      {UART1_Write(127);}
+      {
+        UART1_Write(127);
+        //need to test code below  and add check
+        cur_col+=1;
+        LCD_Chr(cur_row,cur_col,32);
+        cur_col-=1;
+      }
       
       //##############
       //ARROW KEYS
@@ -96,6 +105,40 @@ void main(){
       // there are no ascii codes
       // replace with 91 93 123 && 125?
       // https://stackoverflow.com/questions/2876275/what-are-the-ascii-values-of-up-down-left-right
+
+      //need to test code below
+      if (uart_rd == 91) // up
+      {
+        if(cur_row > 1) cur_row-=1;
+        UART1_Write(91);
+      }
+      if (uart_rd == 93) // down
+      {
+        if(cur_row < 16) cur_row+=1;
+        UART1_Write(93);
+      }
+      if (uart_rd == 123) // right
+      {
+        if (cur_col < 16) {cur_col+=1;}
+        else {
+             if (cur_row < 16){
+                cur_row+=1;
+                cur_col=1;
+             }
+        }
+        UART1_Write(123);
+      }
+      if (uart_rd == 125) // left
+      {
+        if (cur_col > 1) {cur_col-=1;}
+        else {
+             if (cur_row > 1){
+                cur_row-=1;
+                cur_col=16;
+             }
+        }
+        UART1_Write(125);
+      }
     }
   }
 }
