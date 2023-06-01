@@ -53,6 +53,8 @@ cpha
 cpha_bit
 cpol
 cpol_bit
+cur_col
+cur_row
 cy
 cy_bit
 dcen
@@ -186,7 +188,6 @@ m10_bit
 m11
 m11_bit
 main
-move_delay
 mstr
 mstr_bit
 mul_16x16
@@ -402,9 +403,6 @@ tr1_bit
 tr2
 tr2_bit
 txt1
-txt2
-txt3
-txt4
 uart_data_ready
 uart_rd
 uart_rd_ptr
