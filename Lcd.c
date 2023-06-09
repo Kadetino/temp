@@ -38,6 +38,12 @@ void var_preset(){
 	cur_row = 1; // Настроить курсор строк
 }
 
+void temptemp(short int target_row, short int new_row){
+	char temp[LASTCOL_LCD];
+	strncpy(temp,storage[new_row-1],LASTCOL_LCD);
+	Lcd_Out(target_row, 1, temp);
+}
+
 void main(){
 	var_preset(); // свои переменные
 	
@@ -76,7 +82,7 @@ void main(){
 			LCD_Chr(cur_row,cur_col,uart_rd);	// Напечатать символ
 			//storage[LASTROW_LCD*(cur_row-1)+(cur_col-1)] = uart_rd;
 			cur_col+=1;							// Обновить позицию (столбец) курсора
-			if (cur_col >= (LASTCOL_LCD + 1)){	// Если это был последний столбец
+			if (cur_col >= (LASTCOL_LCD + 1)){	// Если это был последний столбец, перенос строки
 				if (cur_row >= LASTROW_LCD) cur_col = LASTCOL_LCD; // Последний столбец и последний символ - оставить курсор на месте
 				else { // Перенос строки
 					cur_col = 1;
