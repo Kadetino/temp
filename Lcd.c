@@ -40,7 +40,7 @@ void var_preset(){
 
 void temptemp(short int target_row, short int new_row){
 	char temp[LASTCOL_LCD];
-	strncpy(temp,storage[new_row-1],LASTCOL_LCD);
+	strncpy(temp,storage[(new_row-1)*LASTCOL_LCD],LASTCOL_LCD);
 	Lcd_Out(target_row, 1, temp);
 }
 
@@ -90,6 +90,7 @@ void main(){
 				}
 			}
 		}
+		/*
 		// unreachable code?
 		else {									// Если курсор на 17м символе (строка заполнена и почему-то курсор на 17ом)
 			if (cur_row < LASTROW_LCD){					// Можно осуществить переход на следуюущую строку
@@ -100,7 +101,7 @@ void main(){
 			else {								// Текущая строка 16я
 				
 			}
-			
+			*/
 			
 		}					
 	}
