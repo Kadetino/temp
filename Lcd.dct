@@ -137,7 +137,6 @@ gf1
 gf1_bit
 hwdt
 hwdt_bit
-i
 ics_auto
 ics_off
 idl
@@ -371,6 +370,7 @@ spr0_bit
 spr1
 spr1_bit
 spsr
+storage
 sub_32x32_fp
 t2con
 t2mod
@@ -381,6 +381,7 @@ tb8_bit
 tclk
 tclk_bit
 tcon
+temptemp
 tf0
 tf0_bit
 tf1
@@ -402,7 +403,6 @@ tr1
 tr1_bit
 tr2
 tr2_bit
-txt1
 uart_data_ready
 uart_rd
 uart_rd_ptr
@@ -419,6 +419,7 @@ uart1_read
 uart1_read_text
 uart1_write
 uart1_write_text
+var_preset
 vdelay_ms
 wcol
 wcol_bit

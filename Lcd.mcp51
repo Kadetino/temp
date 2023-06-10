@@ -33,18 +33,21 @@ File0=LCD.xml
 [OTHER_FILES]
 Count=0
 [SEARCH_PATH]
-Count=11
-Path0=C:\Program Files (x86)\MikroElektronika\mikroC PRO for 8051\defs\
-Path1=C:\Users\Администратор\Desktop\kal\
-Path2=C:\Users\Public\Documents\Mikroelektronika\mikroC PRO for 8051\defs\
-Path3=C:\Users\Public\Documents\Mikroelektronika\mikroC PRO for 8051\Uses\ATMEL\
-Path4=C:\Users\Kadet\Desktop\Новая папка\2я практика - kal-20230525T103228Z-001\2я практика - kal\
-Path5=C:\Users\Администратор\Desktop\serial data received\2я практика - kal-20230525T103228Z-001\2я практика - kal\
-Path6=C:\Program Files (x86)\MikroElektronika\mikroC PRO for 8051\Uses\ATMEL\
-Path7=C:\Program Files (x86)\MikroElectronika\mikroC PRO for 8051\defs\
-Path8=C:\Program Files (x86)\MikroElectronika\mikroC PRO for 8051\Examples\ATMEL\Development Systems\Easy8051v6\Lcd\
-Path9=C:\Program Files (x86)\MikroElectronika\mikroC PRO for 8051\Uses\ATMEL\
-Path10=C:\Program Files (x86)\MikroElectronika\mikroC PRO for 8051\Examples\ATMEL\Development Systems\Easy8051v6\
+Count=14
+Path0=C:\Users\Kadet\Documents\Mikroelektronika\mikroC PRO for 8051\defs\
+Path1=C:\Users\Kadet\Documents\Mikroelektronika\mikroC PRO for 8051\Uses\ATMEL\
+Path2=C:\Users\Kadet\Documents\GitHub\temp\
+Path3=C:\Users\Public\Documents\Mikroelektronika\mikroC PRO for 8051\defs\
+Path4=C:\Program Files (x86)\MikroElektronika\mikroC PRO for 8051\defs\
+Path5=C:\Users\Администратор\Desktop\kal\
+Path6=C:\Users\Public\Documents\Mikroelektronika\mikroC PRO for 8051\Uses\ATMEL\
+Path7=C:\Users\Kadet\Desktop\Новая папка\2я практика - kal-20230525T103228Z-001\2я практика - kal\
+Path8=C:\Users\Администратор\Desktop\serial data received\2я практика - kal-20230525T103228Z-001\2я практика - kal\
+Path9=C:\Program Files (x86)\MikroElektronika\mikroC PRO for 8051\Uses\ATMEL\
+Path10=C:\Program Files (x86)\MikroElectronika\mikroC PRO for 8051\defs\
+Path11=C:\Program Files (x86)\MikroElectronika\mikroC PRO for 8051\Examples\ATMEL\Development Systems\Easy8051v6\Lcd\
+Path12=C:\Program Files (x86)\MikroElectronika\mikroC PRO for 8051\Uses\ATMEL\
+Path13=C:\Program Files (x86)\MikroElectronika\mikroC PRO for 8051\Examples\ATMEL\Development Systems\Easy8051v6\
 [HEADER_PATH]
 Count=0
 [HEADERS]

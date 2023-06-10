@@ -1,5 +1,5 @@
 main
-	__CC2D
+	var_preset
 	Lcd_Init
 		Delay_5500us
 		Delay_1us
