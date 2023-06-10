@@ -1,0 +1,338 @@
+#define rs1 PORTB|=0b00000100
+#define rs0 PORTB&=0b11111011
+#define e1 PORTB|=0b00100000
+#define e0 PORTB&=0b11011111
+
+unsigned char state=0; //0 - ожидание иницализации, 1 - вводится первое число, 2 - вводится второе число, 3 - показывается резульат\ошибка
+unsigned char n=0;//колво цифр на дисплее на данный момент
+unsigned char num1=0, operation=0;//num1- первый операнд, operation - код операции
+unsigned char disp=0;//число, написанное на данный момент на дисплее
+unsigned int tmp=0;//просто перменная
+unsigned char c=0, u=0;//просто переменная
+void sendhalfbyte(unsigned char c) //отправка полубайта на дисплей
+{
+  c<<=4;//сдвиг полубайта в старшую часть байта
+  e1;//1 на пин Е
+  delay_us(50);
+  PORTC&=0b00001111;//чистим PORTC
+  PORTC|=c;//передаем команду-полубайт на PORTC
+  e0;//0 на пин Е
+  delay_us(50);
+}
+
+void sendbyte(unsigned char c, unsigned char mode){
+  if (mode==0){rs0;} //0 - передаем байт-команду, 1 - передаем символ
+  else {rs1;}
+  sendhalfbyte(c>>4);//передаем старшую часть байта
+  sendhalfbyte(c);//передаем младшую часть байта
+}
+void sendchar(unsigned char c){
+   sendbyte(c,1);
+}
+
+void send01(unsigned char c){
+   if ((n==1)&&(disp==0)){//отправка команды отчистки если на экране один нолик
+      sendbyte(0b00000001, 0);
+      n--;
+      delay_ms(50);
+   }
+   if (n<8){//если символов на дисплее меньше 8ми
+      n++;//кол-во символов +1
+      if (c=='1'){disp<<=1;disp+=1;}//меняем число, показываемое на дисплее (сдвиг влево на 1 и добавляем 1)
+      else if (c=='0'){disp<<=1;}//(сдвиг влево на 1)
+      sendbyte(c,1);//отпарвялем новый символ на экран
+   }
+}
+
+void sendnum(unsigned char c){// чистка экрана + отпрвка числа (байта) на дисплей
+   if (n>0){
+      unsigned char i=0,v=n;
+      for (i=v;i>=1;i--){
+         if (((c>>(i-1))&0b00000001)==1){
+            sendchar('1');
+         }
+         else{
+            sendchar('0');
+         }
+         delay_ms(1);
+      }
+   }
+}
+void sendres(unsigned int r, unsigned char s){// чистка экрана + отпрвка числа (2 байта) на дисплей (1 отправка минуцса перед числом, 0 - без него)
+   tmp=r;
+   c=0;//сколько цифр в результате
+   u=0;
+   while(tmp!=0){// определение кол-ва цифр в числе на экране
+      tmp>>=1;
+      c++;
+   }
+   if (s==1){
+      sendchar('-');
+    }
+   for (u=c;u>=1;u--){
+         if (((r>>(u-1))&0b0000000000000001)==1){
+            sendchar('1');
+         }
+         else{
+            sendchar('0');
+         }
+         delay_ms(1);
+    }
+    if (c==0){//если ответ был 0
+      sendchar('0');
+    }
+}
+
+void err(){
+   sendchar('E');
+   //delay_ms(1);
+   sendchar('r');
+   //delay_ms(1);
+   sendchar('r');
+   //delay_ms(1);
+}
+
+void port_ini(){
+   PORTC=0x00;//нулим PORTC
+   DDRC=0xFF;//PORTC на выход
+   PORTB=0x00;//нулим PORTB
+   DDRB=0xFF;//PORTB на выход
+   PORTA=0xF0;//выставляем PORTA
+   DDRA=0x0F;//старший полубайт на вход, младший - на выход
+}
+
+void USART_init(){
+   UBRR0H = 0; //baud rate
+   UBRR0L = 64; //baud rate 9600
+   UCSR0B |= 0b10010000;// бит7 - разрешаем прерывание от USART, разрешение ПРИЕМА по USART
+   UCSR0C |= 0b10001110; //бит7 - обращение к  UCSRC, бит3 - 2 стоп-бита, бит2+бит1 - 8мибитовый режим передачи
+}
+
+void display_ini(){
+   delay_ms(15);
+   sendhalfbyte(0b00000011);
+   delay_ms(4);
+   sendhalfbyte(0b00000011);
+   delay_ms(1);
+   sendhalfbyte(0b00000011);
+   delay_ms(1);
+   sendhalfbyte(0b00000010);
+   delay_ms(1);
+   sendbyte(0b00101000, 0);
+   delay_ms(1);
+   sendbyte(0b00001100, 0);
+   delay_ms(1);
+   sendbyte(0b00000110, 0);
+   delay_ms(1);
+   sendbyte(0b00000001, 0);
+}
+void press0(){
+   if ((state==1)||(state==2)){
+                    send01('0');
+    }
+}
+
+void press1(){
+   if ((state==1)||(state==2)){
+                     send01('1');
+    }
+}
+
+void pressbackspace(){
+   if ((n>0)&&((state==1)||(state==2))){//если на экране есть число и состоянеие = ввод первого или второго числа
+                     n--;
+                     sendbyte(0b00000001, 0);//чистим экран
+                     disp>>=1;//побитово сдвигаем вправо число экрана
+                     delay_ms(30);
+                     sendnum(disp);//отправляем новое число на экран
+    }
+}
+
+void pressreset(){
+   sendbyte(0b00000001, 0);//чистка экрана
+   state=1;
+   n=0;
+   num1=0;
+   operation=0;
+   disp=0;
+}
+
+void pressplus(){
+   if (state==1&&n>0){
+      sendbyte(0b00000001, 0);//чистка экрана
+      num1=disp;//сохранение первого операнда
+      disp=0;
+      n=0;
+      operation=1;//код операции сложения
+      state=2;
+      //delay_ms(30);
+   }
+}
+
+
+void pressminus(){
+   if (state==1&&n>0){
+      sendbyte(0b00000001, 0);//чистка экрана
+      num1=disp;//сохранение первого операнда
+      disp=0;
+      n=0;
+      operation=2;//код операции вычитания
+      state=2;
+      //delay_ms(30);
+   }
+}
+
+void pressmultiply(){
+   if (state==1&&n>0){
+      sendbyte(0b00000001, 0);//чистка экрана
+      num1=disp;//сохранение первого операнда
+      disp=0;
+      n=0;
+      operation=3;//код операции умножения
+      state=2;
+      //delay_ms(30);
+   }
+}
+
+void pressdivide(){
+   if (state==1&&n>0){
+      sendbyte(0b00000001, 0);//чистка экрана
+      num1=disp;//сохранение первого операнда
+      disp=0;
+      n=0;
+      operation=4;//код операции деления
+      state=2;
+      //delay_ms(30);
+   }
+}
+
+void pressequal(){
+   if (state==2&&n>0){
+      switch(operation){
+      case 1:
+         sendbyte(0b00000001, 0);//чистка экрана
+         delay_ms(2);
+         sendres(disp+num1,0);
+         break;
+      case 2:
+         sendbyte(0b00000001, 0);//чистка экрана
+         delay_ms(2);
+         if (num1>=disp){
+              sendres(num1-disp,0);
+         }
+         else{
+            sendres(disp-num1, 1);
+         }
+         break;
+      case 3:
+         sendbyte(0b00000001, 0);//чистка экрана
+         delay_ms(2);
+         sendres(disp*num1,0);
+         break;
+      case 4:
+         sendbyte(0b00000001, 0);//чистка экрана
+         delay_ms(2);
+         if (disp==0){
+            err();
+         }
+         else{
+            sendres(num1/disp,0);}
+         break;
+      }
+      state=3;
+      n=0;
+      num1=0;
+      operation=0;
+      disp=0;
+   }
+}
+
+int main(){
+   unsigned char moving= 0b11101110;//маска опроса кнопок
+   SREG_I_bit = 1;//Разрешение глобальных прерываний
+   port_ini();
+   USART_init();
+   display_ini();
+   state=1;//калькулятор готов к работе
+   while (1){//опрос кнопок
+      PORTA&=0b11110000;
+      PORTA|=moving&0b00001111;
+      delay_ms(1);
+      switch(PORTA&0b00001111){
+         case 0b00001110://1 stroka
+            switch(PINA&0b11110000){//PIN- реальное состояние ножек, PORT - логическое 
+               case 0b11100000:
+                  pressreset();
+                  break;
+               case 0b11010000:
+                  pressbackspace();
+                  break;
+               case 0b10110000:
+                   press1();
+                   break;
+               case 0b01110000:
+                  press0();
+                  break;
+            }
+            break;
+         case 0b00001101://2 stroka
+            switch(PINA&0b11110000){
+               case 0b11100000:
+                  pressdivide();
+                  break;
+               case 0b11010000:
+                  pressmultiply();
+                  break;
+               case 0b10110000:
+                  pressminus();
+                  break;
+               case 0b01110000:
+                  pressplus();
+                  break;
+            }
+            break;
+         case 0b00001011://3 stroka
+            switch(PINA&0b11110000){
+               case 0b01110000:
+                  pressequal();
+                  break;
+            }
+            break;
+      }
+      delay_ms(70);
+      moving = (moving << 1) | (moving >> (8 - 1));//ЦИКЛИЧНЫЙ побитовый сдвиг маски
+   }
+return 0;
+}
+
+void usartint() iv IVT_ADDR_USART0__RX ics ICS_OFF {//прерывание при получении символа по USART
+    switch (UDR0){//прерывание сработало - код символа в UDR0
+      case '1':
+         press1();
+         break;
+      case '0':
+         press0();
+         break;
+      case '+':
+         pressplus();
+         break;
+      case '-':
+         pressminus();
+         break;
+      case '*':
+         pressmultiply();
+         break;
+      case '/':
+         pressdivide();
+         break;
+      case '=':
+         pressequal();
+         break;
+      case '.':
+         pressreset();
+         break;
+      case 0b00001000:
+         pressbackspace();
+         break;
+    }
+}
