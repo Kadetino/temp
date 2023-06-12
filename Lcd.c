@@ -80,7 +80,7 @@ void main(){
         if (32 <= uart_rd && uart_rd <= 122){
                 UART1_Write(uart_rd);                                        // Уведомить QT
                 if (cur_col < (LASTCOL_LCD + 1)){                                                // В строке ещё есть место
-                        LCD_Chr(cur_row,cur_col,uart_rd);        // Напечатать символ
+                        LCD_Chr((cur_row % 2) +1,cur_col,uart_rd);        // Напечатать символ
                         //storage[LASTROW_LCD*(cur_row-1)+(cur_col-1)] = uart_rd;
                         cur_col+=1;                                                        // Обновить позицию (столбец) курсора
                         if (cur_col >= (LASTCOL_LCD + 1)){        // Если это был последний столбец, перенос строки
