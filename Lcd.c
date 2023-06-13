@@ -18,9 +18,16 @@ char storedSymbols[16][16];
 int cursor, displayRowPos;
 
 
+// delay function
 void delay(int cnt) {
     for (int i = 0; i < cnt; i++);
 }
+
+
+// **********************
+// UART FUNCTIONS
+// **********************
+
 
 
 // **********************
@@ -70,6 +77,7 @@ void Lcd_Write(char symbol) {
     delay(10000);
 }
 
+// set cursor in LCD to given position
 void Lcd_Cursor(int row, int col) {
     char pos = 0;
     if (row == 0)
@@ -517,7 +525,6 @@ void setSymbol(char symbol) {
 
                     // need to update display
                     updateDisplay(0);
-
                     Lcd_Cursor(displayRowPos, cursor % 16);
 
                     return;
