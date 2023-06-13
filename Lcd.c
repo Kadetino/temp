@@ -1,209 +1,616 @@
-/*
-        Сonfiguration:
-    MCU:             AT89S8253
-    Oscillator:      External Clock 10.0000 MHz
-    SW:              mikroC PRO for 8051
-*/
-#define LASTCOL_LCD 16
-#define LASTROW_LCD 16
+// LCD Databus is connected to P3.4:P3.7
+#define LcdDataBus P3
 
-#define KEY_ARROWUP 24
-#define KEY_ARROWDOWN 25
-#define KEY_ARROWRIGHT 26
-#define KEY_ARROWLEFT 27
-
-#define KEY_DELETE 127
-#define KEY_ENTER 13
-#define KEY_BACKSPACE 8
-
-#define KEY_EMPTY 0
-
-#include <string.h>
 // LCD module connections
 sbit LCD_RS at P0_4_bit;
+sbit LCD_RW at P0_5_bit;    // not necessary
 sbit LCD_EN at P0_6_bit;
-//
+
+// not necessary (using databus)
 sbit LCD_D4 at P3_4_bit;
 sbit LCD_D5 at P3_5_bit;
 sbit LCD_D6 at P3_6_bit;
 sbit LCD_D7 at P3_7_bit;
 
 
-char storage[256];
-char uart_rd;
-short int cur_col, cur_row;
+// declaring vars
+char storedSymbols[16][16];
+int cursor, displayRowPos;
 
-void var_preset(){
-        //memset(storage, KEY_EMPTY, 256); // Заполнить филлерами KEY_EMPTY
-        cur_col = 1; // Настроить курсор столбцов
-        cur_row = 1; // Настроить курсор строк
+
+void delay(int cnt) {
+    for (int i = 0; i < cnt; i++);
 }
 
-void temptemp(short int target_row, short int new_row){
-        char temp[LASTCOL_LCD];
-        strncpy(temp,storage[(new_row-1)*LASTCOL_LCD],LASTCOL_LCD);
-        Lcd_Out(target_row, 1, temp);
+
+// **********************
+// INTERNAL LCD FUNCTIONS
+// **********************
+
+
+// send command to LCD in 4-bit mode
+void Lcd_Cmd(char cmd) {
+    LcdDataBus = (cmd & 0xF0);     // Send higher half-byte
+    LCD_RS = 0;                    // Send LOW pulse on RS pin for selecting Command register
+    LCD_RW = 0;                    // Send LOW pulse on RW pin for Write operation
+    LCD_EN = 1;                    // Generate a High-to-low pulse on EN pin
+    delay(1000);
+    LCD_EN = 0;
+
+    delay(10000);
+
+    LcdDataBus = ((cmd<<4) & 0xF0); //Send Lower half-byte
+    LCD_RS = 0;                     // Send LOW pulse on RS pin for selecting Command register
+    LCD_RW = 0;                     // Send LOW pulse on RW pin for Write operation
+    LCD_EN = 1;                     // Generate a High-to-low pulse on EN pin
+    delay(1000);
+    LCD_EN = 0;
+
+    delay(10000);
 }
 
-void main(){
-        var_preset(); // свои переменные
-        
-        // Настройка LCD
-        Lcd_Init();
-        Lcd_Cmd(_LCD_CLEAR);
-        Lcd_Cmd(_LCD_UNDERLINE_ON);
-        Lcd_Cmd(_LCD_BLINK_CURSOR_ON);
-        //  Lcd_Cmd(_LCD_CURSOR_OFF);
-        
-        // Серийный порт
-        UART1_Init(4800); // Установить Baud rate 4800
-        Delay_ms(500); // Wait for UART module to stabilize
+// write symbol to lcd
+void Lcd_Write(char symbol) {
+    LcdDataBus = (symbol & 0xF0);      //Send higher nibble
+    LCD_RS = 1;                        // Send HIGH pulse on RS pin for selecting data register
+    LCD_RW = 0;                        // Send LOW pulse on RW pin for Write operation
+    LCD_EN = 1;                        // Generate a High-to-low pulse on EN pin
+    delay(1000);
+    LCD_EN = 0;
 
-        // Endless loop
-        while (1) { 
-        if (UART1_Data_Ready()){
-                uart_rd = UART1_Read(); // Прочитать полученное
+    delay(10000);
+
+    LcdDataBus = ((symbol<<4) & 0xF0);  // Send Lower nibble
+    LCD_RS = 1;                         // Send HIGH pulse on RS pin for selecting data register
+    LCD_RW = 0;                         // Send LOW pulse on RW pin for Write operation
+    LCD_EN = 1;                         // Generate a High-to-low pulse on EN pin
+    delay(1000);
+    LCD_EN = 0;
+
+    delay(10000);
+}
+
+void Lcd_Cursor(int row, int col) {
+    char pos = 0;
+    if (row == 0)
+        pos = 0x80 + (col + 1);  // First line
+    else if (row == 1)
+        pos = 0xC0 + (col + 1);  // Second line
+
+    Lcd_Cmd(pos);                // Change cursor position
+}
+
+// send symbol to LCD in specified row and column
+void Lcd_Chr(int row, int col, char symbol) {
+    Lcd_Cursor(row, col);          // Update cursor position
+    Lcd_Write(symbol);             // Write char to LCD
+}
+
+// initialize LCD with default params
+void Lcd_Init() {
+    Lcd_Cmd(0x02);        // Move the cursor to home position
+    Lcd_Cmd(0x28);        // Initialize LCD in 4-bit mode, enable 5x7 mode for chars
+    Lcd_Cmd(0x0E);        // Display OFF, Cursor ON (underline)
+    Lcd_Cmd(0x01);        // Clear Display
+    Lcd_Cmd(0x80);        // Move the cursor to beginning of first line
+}
 
 
-    //##############
-    //REGULAR LETTERS
-    //##############
-    // NAME               INT
-    // Lower case latin   97-122
-    // Upper case latin   65-90
-    // Numbers            48-57
-    // !"#$%&'()*+,-./    33-47
-    // :;<=>?@            58-64
-    // [\]^_`             91-96
-    // {|}~               123-126
-        // <space>                          32
-        if (32 <= uart_rd && uart_rd <= 122){
-                UART1_Write(uart_rd);                                        // Уведомить QT
-                if (cur_col < (LASTCOL_LCD + 1)){                                                // В строке ещё есть место
-                        LCD_Chr(cur_row,cur_col,uart_rd);        // Напечатать символ
-                        //storage[LASTROW_LCD*(cur_row-1)+(cur_col-1)] = uart_rd;
-                        cur_col+=1;                                                        // Обновить позицию (столбец) курсора
-                        if (cur_col >= (LASTCOL_LCD + 1)){        // Если это был последний столбец, перенос строки
-                                if (cur_row >= LASTROW_LCD) cur_col = LASTCOL_LCD; // Последний столбец и последний символ - оставить курсор на месте
-                                else { // Перенос строки
-                                        cur_col = 1;
-                                        cur_row+= 1;
-                                }
-                        }
+
+// **********************
+// EXTERNAL LCD FUNCTIONS
+// **********************
+
+
+// update LCD in specified direction
+void updateDisplay(bool down){
+    int pos = 1;
+
+    Lcd_Cmd(0x01);  // Clear Display
+    
+    // update in bottom direction
+    if (down) {
+        for (int row = 0; row < 2; ++row) {
+            for (int col = 0; col < 16; ++col) {
+                if (storedSymbols[(cursor / 16) - pos][col] == '\n' ||
+                        storedSymbols[(cursor / 16) - pos][col] == '\0') {
+                    Lcd_Chr(row, col, ' ');
                 }
-                /*
-                // unreachable code?
-                else {                                                                        // Если курсор на 17м символе (строка заполнена и почему-то курсор на 17ом)
-                        if (cur_row < LASTROW_LCD){                                        // Можно осуществить переход на следуюущую строку
-                                cur_col = 1;                                        // поставить позицию курсора в начало        
-                                cur_row+= 1;                                        // перейти на следующую строку
-                                LCD_Chr(cur_row,cur_col,uart_rd);        // Напечатать символ
-                        }
-                        else {                                                                // Текущая строка 16я
-                                
-                        }
-                        */
-                        
+                else {
+                    Lcd_Chr(row, col, storedSymbols[(cursor / 16) - pos][col]);
+                }
+            }
+            pos = 0;
+        }
+    }
+    // update in top direction
+    else {
+        pos = 0;
+        for (int row = 0; row < 2; ++row) {
+            for (int col = 0; col < 16; ++col) {
+                if (storedSymbols[(cursor / 16) + pos][col] == '\n' || 
+                        storedSymbols[(cursor / 16) + pos][col] == '\0') {
+                    Lcd_Chr(row, col, ' ');
+                }
+                else {
+                     Lcd_Chr(row, col, storedSymbols[(cursor / 16) + pos][col]);
+                }
+            }
+            pos = 1;
+        }
+    }
+}
 
+// function used in Enter button to shift rows
+void shiftSymbols() {
+    char tmp[16][16];
+    memcpy(tmp, storedSymbols, sizeof(storedSymbols));
+
+    int shift = 16 - (cursor % 16);
+
+    for (int i = 0; i < shift; i++) {
+        storedSymbols[(cursor+i) / 16][(cursor+i) % 16] = '\0';
+    }
+
+    if (cursor % 16 == 0) {
+        bool check = 0;
+        for (int i = 0; i < 16; i++) {
+            if (storedSymbols[(cursor+i) / 16][(cursor+i) % 16] != '\0') {
+                check = 1;
+                break;
+            }
+        }
+        if (!check) {
+            storedSymbols[cursor / 16][cursor % 16] = '\n';
+        }
+    }
+
+    // last row
+    if(cursor / 16 == 15){
+        updateDisplay(1);
+        return;
+    }
+
+    //display[displayRowPos][cursor % 16]->setStyleSheet("background-color: black; color: green; font-family: Courier New; font-size: 40px; font-weight: bold");
+    displayRowPos = 1;
+
+    cursor += shift;
+
+    //display[displayRowPos][cursor % 16]->setStyleSheet("background-color: black; color: green; font-family: Courier New; font-size: 40px; font-weight: bold; border-left: 4px solid red");
+
+    // line break
+    for (int i = 0; i < shift; i++) {
+        storedSymbols[(cursor+i) / 16][(cursor+i) % 16] = tmp[(cursor-shift+i) / 16][(cursor-shift+i) % 16];
+    }
+    // filling with '\0' the rest of the line
+    for (int i = shift; i < 16; i++) {
+        storedSymbols[(cursor+i) / 16][(cursor+i) % 16] = '\0';
+    }
+
+    shift = 16 - (cursor % 16);
+    int vCursor = cursor + shift;
+
+    while (vCursor < 255) {
+        storedSymbols[vCursor / 16][vCursor % 16] = tmp[(vCursor - shift) / 16][(vCursor - shift) % 16];
+        vCursor++;
+    }
+
+    if (cursor % 16 == 0) {
+        bool check = 0;
+        for (int i = 0; i < 16; i++) {
+            if (storedSymbols[(cursor+i) / 16][(cursor+i) % 16] != '\0') {
+                check = 1;
+                break;
+            }
+        }
+        if (!check) {
+            storedSymbols[cursor / 16][cursor % 16] = '\n';
+        }
+    }
+
+    updateDisplay(1);
+
+    // need to update cursor position
+    Lcd_Cursor(displayRowPos, cursor % 16);
+}
+
+// check and set symbol into lcd
+void setSymbol(char symbol) {
+    // Enter
+    if (symbol == 0x0d) {
+        if (cursor == 256) {
+            return;
+        }
+        shiftSymbols();
+    }
+
+    // Up Arrow
+    else if (symbol == 0x18) {
+        if (cursor / 16 == 0) {
+            return;
+        }
+        int shift = cursor % 16;
+        for (int i = cursor-16; i >= cursor-shift-16; i--) {
+            if (storedSymbols[i / 16][i % 16] == '\0') {
+                continue;
+            }
+
+            //display[displayRowPos][cursor % 16]->setStyleSheet("background-color: black; color: green; font-family: Courier New; font-size: 40px; font-weight: bold");
+            cursor = i;
+
+            if (cursor % 16 != 15 && storedSymbols[(cursor+1) / 16][(cursor+1) % 16] == '\0' && storedSymbols[cursor / 16][cursor % 16] != '\n') {
+                cursor++;
+            }
+
+            displayRowPos = 0;
+            updateDisplay(0);
+
+            Lcd_Cursor(displayRowPos, cursor % 16);
+
+            //display[displayRowPos][cursor % 16]->setStyleSheet("background-color: black; color: green; font-family: Courier New; font-size: 40px; font-weight: bold; border-left: 4px solid red");
+
+            return;
+        }
+    }
+
+    // Down Arrow
+    else if (symbol == 0x19) {
+        if (cursor / 16 == 15) {
+            return;
+        }
+        int shift = cursor % 16;
+        for (int i = cursor+16; i >= cursor-shift+16; i--) {
+            if (storedSymbols[i / 16][i % 16] == '\0') {
+                continue;
+            }
+
+            //display[displayRowPos][cursor % 16]->setStyleSheet("background-color: black; color: green; font-family: Courier New; font-size: 40px; font-weight: bold");
+            cursor = i;
+
+            if (cursor % 16 != 15 && storedSymbols[(cursor+1) / 16][(cursor+1) % 16] == '\0' && storedSymbols[cursor / 16][cursor % 16] != '\n') {
+                cursor++;
+            }
+
+            displayRowPos = 1;
+            updateDisplay(1);
+
+            Lcd_Cursor(displayRowPos, cursor % 16);
+
+            //display[displayRowPos][cursor % 16]->setStyleSheet("background-color: black; color: green; font-family: Courier New; font-size: 40px; font-weight: bold; border-left: 4px solid red");
+
+            return;
+        }
+    }
+
+    // Right Arrow
+    else if (symbol == 0x1a) {
+        if (cursor == 256) {
+            return;
+        }
+        else if (cursor == 255 && storedSymbols[cursor / 16][cursor % 16] != '\0') {
+            cursor++;
+            Lcd_Cursor(displayRowPos, cursor % 16);
+            return;
+        }
+        else if (cursor % 16 == 15 && storedSymbols[(cursor+1) / 16][(cursor+1) % 16] != '\0') {
+            cursor++;
+            displayRowPos = 1;
+            updateDisplay(1);
+            Lcd_Cursor(displayRowPos, cursor % 16);
+        }
+        else if ((cursor % 16 == 0 
+                    && storedSymbols[cursor / 16][cursor % 16] == '\n' 
+                    && cursor < 240) 
+                    || storedSymbols[cursor / 16][cursor % 16] == '\0') {
+            for (int i = cursor+1; i < 256; i++) {
+                if (storedSymbols[i / 16][i % 16] != '\0') {
+                    cursor = i;
+                    displayRowPos = 1;
+                    updateDisplay(1);
+                    Lcd_Cursor(displayRowPos, cursor % 16);
+                    break;
+                }
+            }
+        }
+        else if (storedSymbols[cursor / 16][cursor % 16] != '\0') {
+            // check \n
+            cursor++;
+            Lcd_Cursor(displayRowPos, cursor % 16);
+        }
+    }
+
+    // Left Arrow
+    else if (symbol == 0x1b) {
+        if (cursor == 0) {
+            return;
+        }
+        else if (cursor == 256) {
+            cursor--;
+            Lcd_Cursor(displayRowPos, cursor % 16);
+        }
+        else if (cursor % 16 == 0) {
+            do {
+                cursor--;
+                if (cursor == 0 || (cursor % 16 == 0 && storedSymbols[cursor / 16][cursor % 16] == '\0')) {
+                    break;
+                }
+            } while(storedSymbols[cursor / 16][cursor % 16] == '\0');
+
+            if (cursor % 16 != 15 && storedSymbols[cursor / 16][cursor % 16] != '\n') {
+                cursor++;
+            }
+
+            displayRowPos = 0;
+            updateDisplay(0);
+            Lcd_Cursor(displayRowPos, cursor % 16);
+        }
+        else {
+            cursor--;
+            Lcd_Cursor(displayRowPos, cursor % 16);
+        }
+    }
+
+    // Delete
+    else if (symbol == 0x7f) {
+        if (cursor >= 255) {
+            return;
+        }
+        if (cursor % 16 != 15 && storedSymbols[cursor / 16][cursor % 16] != '\0') {
+            if (storedSymbols[cursor / 16][cursor % 16] == '\n') {
+                char tmp[16][16];
+                memcpy(tmp, storedSymbols, sizeof(storedSymbols));
+                int vCursor = cursor + 16;
+                while (vCursor < 255) {
+                    storedSymbols[(vCursor-16) / 16][(vCursor-16) % 16] = tmp[vCursor / 16][vCursor % 16];
+                    vCursor++;
+                }
+                // need to update display
+                if (displayRowPos == 0) {
+                    for (int i = cursor; i < cursor + 16; i++) {
+                        // first row
+                        if (storedSymbols[i / 16][i % 16] != '\n' 
+                                && storedSymbols[i / 16][i % 16] != '\0') {
+                            
+                            Lcd_Chr(0, i % 16, storedSymbols[i / 16][i % 16]);
+                        }
+                        else {
+                            Lcd_Chr(0, i % 16, ' ');
+                        }
+
+                        // second row
+                        if (storedSymbols[(i+16) / 16][(i+16) % 16] != '\n' 
+                                && storedSymbols[(i+16) / 16][(i+16) % 16] != '\0') {
+                            Lcd_Chr(1, i % 16, storedSymbols[(i+16) / 16][(i+16) % 16]);
+                        }
+                        else {
+                            Lcd_Chr(1, i % 16, ' ');
+                        }
+                    }
+                }
+                else {
+                    for (int i = cursor; i < cursor + 16; i++) {
+                        if (storedSymbols[i / 16][i % 16] != '\n' 
+                                && storedSymbols[i / 16][i % 16] != '\0') {
+                            
+                            Lcd_Chr(1, i % 16, storedSymbols[i / 16][i % 16]);
+                        }
+                        else {
+                            Lcd_Chr(1, i % 16, ' ');
+                        }
+                    }
+                }
+                return;
+            }
+
+            int shift = 16 - (cursor % 16);
+            for (int i = 0; i < shift; i++) {
+                storedSymbols[(cursor+i) / 16][(cursor+i) % 16] = storedSymbols[(cursor+i+1) / 16][(cursor+i+1) % 16];
+                
+                if (storedSymbols[(cursor+i+1) / 16][(cursor+i+1) % 16] == '\0' ||
+                        storedSymbols[(cursor+i+1) / 16][(cursor+i+1) % 16] == '\n') {
+                    
+                    Lcd_Chr(displayRowPos, (cursor+i) % 16, ' ');
+                }
+                else {
+                    Lcd_Chr(displayRowPos, (cursor+i) % 16, storedSymbols[(cursor+i+1) / 16][(cursor+i+1) % 16]);
+                }
+            }
+            storedSymbols[(cursor+shift-1) / 16][(cursor+shift-1) % 16] = '\0';
+
+            Lcd_Chr(displayRowPos, (cursor+shift-1) % 16, ' ');
+        }
+        else if (storedSymbols[(cursor+1) / 16][(cursor+1) % 16] == '\0') {
+            int shift = 16 - (cursor % 16);
+            if ((cursor + shift) >= 255) {
+                return;
+            }
+            if (storedSymbols[(cursor+shift) / 16][(cursor+shift) % 16] == '\n') {
+                char tmp[16][16];
+                memcpy(tmp, storedSymbols, sizeof(storedSymbols));
+                int vCursor = cursor + 16 + shift;
+
+                if (vCursor >= 255) {
+                    return;
+                }
+
+                while (vCursor < 255) {
+                    storedSymbols[(vCursor-16) / 16][(vCursor-16) % 16] = tmp[vCursor / 16][vCursor % 16];
+                    vCursor++;
+                }
+                // need to update display
+                if (displayRowPos == 0) {
+                    for (int i = cursor + shift; i < cursor + 16 + shift; i++) {
+
+                        if (storedSymbols[i / 16][i % 16] == '\0' 
+                                || storedSymbols[i / 16][i % 16] == '\n') { 
+
+                            Lcd_Chr(1, i % 16, ' ');        
+                        }
+                        else {
+                            Lcd_Chr(1, i % 16, storedSymbols[i / 16][i % 16]); 
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Backspace
+    else if (symbol == 0x08) {
+        if (cursor == 0) {
+            return;
+        }
+        if (cursor == 256) {
+            cursor--;
+            storedSymbols[cursor / 16][cursor % 16] = '\0';
+
+            Lcd_Chr(displayRowPos, cursor % 16, ' '); 
+            Lcd_Cursor(displayRowPos, cursor % 16);
+            return;
         }
 
-    //##############
-    //SPECIAL KEYS
-    //##############
-        
-        // ENTER
-    if (uart_rd == KEY_ENTER){
-                UART1_Write(KEY_ENTER);                                                // Уведомить QT
-                if (cur_row < LASTROW_LCD){                                                // Если переход возможен (==количество строк позволяет)
-                        cur_row +=1;                                                // Поменять строку
-                        if (cur_col != 1) cur_col = 1;                 // Переместить курсор на 1й символ, если он был на первом символе
+        if (cursor % 16 != 0) {
+            int shift = 16 - (cursor % 16);
+            for (int i = cursor-1; i < cursor+shift-1; i++) {
+                storedSymbols[i / 16][i % 16] = storedSymbols[(i+1) / 16][(i+1) % 16];
+
+                if (storedSymbols[i / 16][i % 16] == '\0' 
+                        || storedSymbols[i / 16][i % 16] == '\n') {
+                    Lcd_Chr(displayRowPos, cursor % 16, ' ');
                 }
-    }
-        
-        // BACKSPACE
-    if (uart_rd == KEY_BACKSPACE){
-                UART1_Write(KEY_BACKSPACE);                                                        // Уведомить QT
-                if (cur_col > 1){                                                // Если символ не первый в строке, удалить предыдуший курсору символ и оставить курсор там
-                        cur_col-=1;                                                        // Вернуть курсор назад
-                        LCD_Chr(cur_row,cur_col,KEY_EMPTY);                // Удалить символ
-                        //storage[LASTROW_LCD*(cur_row-1)+(cur_col-1)] = KEY_EMPTY;
-                }        
-                else {                                                                        // Курсор на 1ом символе
-                        if (cur_row > 1){                                          // Курсор НЕ на 1й строке, иначе игнорируем
-                                cur_row -=1;                                        // Временно изменить строку
-                                cur_col = LASTCOL_LCD;                                        // Временно изменить столбец
-                                LCD_Chr(cur_row,cur_col,KEY_EMPTY);        // Удалить символ
-                                //storage[LASTROW_LCD*(cur_row-1)+(cur_col-1)] = KEY_EMPTY;
-                                cur_col = 1;                                        // Вернуть столбец в изначальное положение
-                                cur_row +=1;                                        // Вернуть строку в изначальное положение
-                        }
+                else {
+                    Lcd_Chr(displayRowPos, cursor % 16, storedSymbols[i / 16][i % 16]);
                 }
-      
-    }
-        
-        // DELETE
-    if (uart_rd == KEY_DELETE){
-                UART1_Write(KEY_DELETE);                                                  // Уведомить QT
-                if (cur_col < LASTCOL_LCD){                                                   // Если символ не последний в строке, удалить последующий символ после курсора
-                        cur_col+=1;                                                          // Временно изменить столбец
-                        LCD_Chr(cur_row,cur_col,KEY_EMPTY);                  // Удалить символ
-                        //storage[LASTROW_LCD*(cur_row-1)+(cur_col-1)] = KEY_EMPTY;
-                        cur_col-=1;                                                          // Вернуть столбец в изначальное положение
-                }         
-                else {                                                                          // Курсор на 16ом символе
-                        if (cur_row < LASTROW_LCD){                                          // Курсор НЕ на 16й строке, иначе игнорируем
-                                cur_row +=1;                                        // Временно изменить строку
-                                cur_col = 1;                                        // Временно изменить столбец
-                                LCD_Chr(cur_row,cur_col,KEY_EMPTY);        // Удалить символ
-                                //storage[LASTROW_LCD*(cur_row-1)+(cur_col-1)] = KEY_EMPTY;
-                                cur_col = LASTCOL_LCD;                                        // Вернуть столбец в изначальное положение
-                                cur_row -=1;                                        // Вернуть строку в изначальное положение
-                        }
+            }
+            storedSymbols[(cursor+shift-1) / 16][(cursor+shift-1) % 16] = '\0';
+            Lcd_Chr(displayRowPos, (cursor+shift-1) % 16, ' ');
+            
+            cursor--;
+
+            Lcd_Cursor(displayRowPos, cursor % 16);
+        }
+        else {
+            if (cursor / 16 == 0) {
+                return;
+            }
+            for (int i = cursor-1; i>=cursor-16; i--) {
+                if (storedSymbols[i / 16][i % 16] == '\0') {
+                    continue;
                 }
+                if (storedSymbols[i / 16][i % 16] == '\n') {
+                    char tmp[16][16];
+                    int vCursor = i;
+
+                    memcpy(tmp, storedSymbols, sizeof(storedSymbols));
+
+                    if (vCursor >= 255 || vCursor < 0) {
+                        return;
+                    }
+
+                    while (vCursor+16 < 255) {
+                        storedSymbols[vCursor / 16][vCursor % 16] = tmp[(vCursor+16) / 16][(vCursor+16) % 16];
+                        vCursor++;
+                    }
+
+                    cursor = i;
+                    displayRowPos = 0;
+
+                    // need to update display
+                    updateDisplay(0);
+
+                    Lcd_Cursor(displayRowPos, cursor % 16);
+
+                    return;
+                }
+                else {
+                    cursor = i;
+                    displayRowPos = 0;
+                    
+                    Lcd_Chr(displayRowPos, cursor % 16, ' ');
+
+                    storedSymbols[cursor / 16][cursor % 16] = '\0';
+
+                    if (cursor % 16 == 0) {
+                        storedSymbols[cursor / 16][cursor % 16] = '\n';
+                    }
+
+                    // need to update display
+                    updateDisplay(0);
+                    Lcd_Cursor(displayRowPos, cursor % 16);
+
+                    return;
+                }
+            }
+        }
     }
+
+    // Other allowed symbols
+    else if (symbol >= 0x20 && symbol <= 0x7e) {
+        // check forbidden cursor pos
+        if (cursor == 256){
+            return;
+        }
+        // check last cursor pos
+        if (cursor == 255) {
+            storedSymbols[cursor / 16][cursor % 16] = symbol;
+
+            // update display
+            Lcd_Chr(displayRowPos, cursor % 16, symbol);
+            Lcd_Cursor(displayRowPos, cursor % 16);
+
+            // update cursor
+            cursor++;
+            return;
+        }
+        // check for last position
+        if (cursor % 16 == 15){
+            // update all stored chars
+            storedSymbols[cursor / 16][cursor % 16] = symbol;
+
+            // update display
+            Lcd_Chr(displayRowPos, cursor % 16, symbol);
+
+            // update cursors
+            cursor++;
+            displayRowPos = 1;
+
+            if (cursor < 256 && storedSymbols[cursor / 16][cursor % 16] == '\0') {
+                storedSymbols[cursor / 16][cursor % 16] = '\n';
+            }
+
+            updateDisplay(1);
+            Lcd_Cursor(displayRowPos, cursor % 16);
+        }
+
+        else {
+            storedSymbols[cursor / 16][cursor % 16] = symbol;
+
+            Lcd_Chr(displayRowPos, cursor % 16, symbol);
+
+            cursor++;
+
+            Lcd_Cursor(displayRowPos, cursor % 16);
+        }
+    }
+
+}
+
+
+void main() {
+    cursor, displayRowPos = 0;
     
-    //##############
-    //ARROW KEYS
-    //##############
-        
-        // ARROW UP
-    if (uart_rd == KEY_ARROWUP){
-                UART1_Write(KEY_ARROWUP);                                                  // Уведомить QT
-                if(cur_row > 1) {cur_row-=1;}                         // Если текущий ряд не самый первый, то подняться на 1 строку
-      
+
+    // filling stored symbols with null-byte
+    for (int row = 0; row < 16; ++row) {
+        for (int col = 0; col < 16; ++col) {
+            storedSymbols[row][col] = '\0';
+        }
     }
-        
-        // ARROW DOWN
-    if (uart_rd == KEY_ARROWDOWN){
-                UART1_Write(KEY_ARROWDOWN);                                                    // Уведомить QT
-                if(cur_row < LASTROW_LCD) {cur_row+=1;}                         // Если текущий ряд не самый последний, то опуститься на 1 строку
-    }
-        
-        // ARROW RIGHT
-    if (uart_rd == KEY_ARROWRIGHT){
-                UART1_Write(KEY_ARROWRIGHT);                                                // Уведомить QT
-                if (cur_col < LASTCOL_LCD) {cur_col+=1;}                        // Если текущая позиция курсора не на последнем столбце, то смещение вправо на 1
-                else {                                                                        // иначе (==курсор на последнем 16ом символе)
-                        if (cur_row < LASTROW_LCD){                                        // Проверка что ещё есть строки снизу на которые можно перейти. Иначе игнорируем. (else последняя строка;последний символ)
-                                cur_row+=1;                                                // переход на новую строку
-                                cur_col=1;                                                // обновить столбец курсора на первый символ
-           }
-      }
-      
-    }
-        
-        // ARROW LEFT
-    if (uart_rd == KEY_ARROWLEFT){
-                UART1_Write(KEY_ARROWLEFT);                                                // Уведомить QT
-                if (cur_col > 1) {cur_col-=1;}                        // Если текущая позиция курсора не на первом столбце, то смещение влево на 1
-                else {                                          // иначе (==курсор на 1ом символе)
-                        if (cur_row > 1){                           // Проверка что ещё есть строки сверху на которые можно перейти. Иначе игнорируем. (else первая строка;первый символ)
-                                cur_row-=1;                                                // переход на новую строку
-                                cur_col=LASTCOL_LCD;                                                // обновить столбец курсора на последний символ
-                        }
-                }
-    }
-    
-        } // if UART1_Data_Ready()
-  } // While
-} // main
+
+    Lcd_Init();
+    Lcd_Cmd(_LCD_CLEAR);
+    Lcd_Cmd(_LCD_CURSOR_OFF);
+
+    UART1_Init(4800); 
+
+}
