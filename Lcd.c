@@ -597,9 +597,9 @@ void setSymbol(char symbol) {
 
 
 void main() {
+    char uart_rd;
     cursor, displayRowPos = 0;
     
-
     // filling stored symbols with null-byte
     for (int row = 0; row < 16; ++row) {
         for (int col = 0; col < 16; ++col) {
@@ -608,9 +608,19 @@ void main() {
     }
 
     Lcd_Init();
-    Lcd_Cmd(_LCD_CLEAR);
-    Lcd_Cmd(_LCD_CURSOR_OFF);
+    delay(1000);
 
     UART1_Init(4800); 
+    delay(1000);
+
+    while(1) {
+        if (UART1_Data_Ready()) {       // If data is received,
+            uart_rd = UART1_Read();     // read the received data,
+            UART1_Write(uart_rd);       // and send data via UART
+
+            setSymbol(uart_rd);         // execute command on LCD
+            delay(2000);
+        }
+    }
 
 }
